@@ -1,0 +1,932 @@
+{
+  "name": "Instagram DM Agent - Main Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "instagram",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1744,
+        -560
+      ],
+      "id": "1f0820ce-89e4-4565-b3e2-056e94329b08",
+      "name": "Webhook",
+      "webhookId": "76316578-12e5-45cb-849f-53298ba17794"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -1536,
+        -560
+      ],
+      "id": "2f45c4ec-cbf2-4dfe-85bd-256e879b0bbf",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "instagram",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -2336,
+        -240
+      ],
+      "id": "526d159d-eac3-4684-a6d5-b20039be1fe1",
+      "name": "Webhook1",
+      "webhookId": "e12ceb83-f41a-4d4f-a21c-871087cb659b"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entry = $json.body?.entry?.[0];\n\nlet m = null;\nif (entry?.messaging?.[0]) {\n  // real DM format\n  const x = entry.messaging[0];\n  m = { sender: x.sender, recipient: x.recipient, message: x.message };\n} else if (entry?.changes?.[0]?.value) {\n  // Meta test-button format\n  m = entry.changes[0].value;\n}\n\nconst text = m?.message?.text || null;\n\nreturn {\n  json: {\n    senderId: m?.sender?.id || null,\n    recipientId: m?.recipient?.id || null,\n    messageText: text,\n    mid: m?.message?.mid || null,\n    isEcho: !!m?.message?.is_echo,\n    processable: !!text && !m?.message?.is_echo\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2144,
+        -240
+      ],
+      "id": "a3345159-c3af-40dc-a3bc-afb4fa6ba5da",
+      "name": "Code in JavaScript",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "39b8412a-e798-4095-a66a-044290b346ee",
+              "leftValue": "={{ $json.processable }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1952,
+        -256
+      ],
+      "id": "ecf7f0e4-eff9-47d7-a0c7-cb699c1b3e79",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "contacts",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "psid",
+              "keyValue": "={{ $json.senderId }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1808,
+        -352
+      ],
+      "id": "7584c3cf-7484-4afa-a8af-1b4a0670902b",
+      "name": "Get a row",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "327RHTvecFRY0647",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.all();\nconst original = $('Code in JavaScript').item.json;\n\nconst contactFound = result.length > 0 && result[0].json.id !== undefined;\n\nreturn {\n  json: {\n    contactFound,\n    existingContactId: contactFound ? result[0].json.id : null,\n    senderId: original.senderId,\n    messageText: original.messageText\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1632,
+        -368
+      ],
+      "id": "1f9aaec2-b0b9-49dc-8c0b-cb4e48209975",
+      "name": "Check Contact",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4b77ec41-a5fb-48c0-8d82-156b1fa56dad",
+              "leftValue": "={{ $json.contactFound }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1424,
+        -320
+      ],
+      "id": "92911312-c05a-46d0-84fb-de24f12b8db4",
+      "name": "contact found"
+    },
+    {
+      "parameters": {
+        "tableId": "contacts",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "psid",
+              "fieldValue": "={{ $json.senderId }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1168,
+        -384
+      ],
+      "id": "541b44eb-bed1-4139-a15c-9a28f4922fb9",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "327RHTvecFRY0647",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const newContact = $json;\nconst original = $('Check Contact').item.json;\n\nreturn {\n  json: {\n    contactId: newContact.id,\n    senderId: original.senderId,\n    messageText: original.messageText\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        -416
+      ],
+      "id": "3c6b857e-d663-4815-b724-3f95cfc48a00",
+      "name": "Normalize New Contact",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $json;\n\nreturn {\n  json: {\n    contactId: original.existingContactId,\n    senderId: original.senderId,\n    messageText: original.messageText\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1232,
+        -176
+      ],
+      "id": "c89caa91-17fe-4f6a-9865-63bb210413d6",
+      "name": "Normalize Existing Contact",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.messageText }}",
+        "options": {
+          "systemMessage": "You are a friendly assistant responding to Instagram DMs for a \nbusiness. Answer questions using the knowledge base tool when \nrelevant information is available.\n\nIf the knowledge base tool does not return information that directly \nanswers the question, do NOT guess or infer an answer from unrelated \ncontext. Instead, say you don't have that specific information and \noffer to connect them with the team for details.\n\nIf the person says anything indicating they want to proceed, sign \nup, get started, or are interested in buying or booking — even \nphrases like \"I'm interested\", \"how do I get started\", \"sounds \ngood\", or similar — treat this as buying interest. Let them know \nyou'll send a link, and end your message with this exact tag on its \nown line:\n\n[INTERESTED: yes]\n\nOnly skip this tag if they are clearly still asking general \nquestions or have not expressed any interest in proceeding."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -992,
+        -208
+      ],
+      "id": "bada33cc-9075-410f-8050-78175e1dbbea",
+      "name": "AI Agent",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.contactId }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -1056,
+        0
+      ],
+      "id": "98af4f61-26ca-4c60-89dc-e269da92a83c",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        -848,
+        144
+      ],
+      "id": "8f561693-5c1b-4951-80b3-a366041e5ab8",
+      "name": "Supabase Vector Store",
+      "credentials": {
+        "supabaseApi": {
+          "id": "327RHTvecFRY0647",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Use this tool to search the business knowledge base for answers to \ncustomer questions about products, services, pricing, policies, or \nany other business information. Always use this before answering a \nfactual question about the business."
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1.1,
+      "position": [
+        -832,
+        16
+      ],
+      "id": "2935f01b-b8c3-4737-b8be-7bc6908336b9",
+      "name": "knowledge base"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -1216,
+        32
+      ],
+      "id": "ec9a5b59-43a7-446d-8139-a98f936fde4e",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "krQtyCvlANyYm7Xt",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -928,
+        336
+      ],
+      "id": "4982fd99-d558-459e-a46f-60d57e852ff9",
+      "name": "Embeddings Google Gemini",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "krQtyCvlANyYm7Xt",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -576,
+        256
+      ],
+      "id": "29097a14-4b66-4da9-8639-fd38f65e2fe4",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "krQtyCvlANyYm7Xt",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiText = $json.output || $json.text || '';\n\nlet original;\ntry {\n  original = $('Normalize New Contact').item.json;\n} catch (e) {\n  original = $('Normalize Existing Contact').item.json;\n}\n\nconst interested = /\\[INTERESTED:\\s*yes\\]/i.test(aiText);\nconst cleanReply = aiText.replace(/\\[INTERESTED:.*?\\]/i, '').trim();\n\nreturn {\n  json: {\n    contactId: original.contactId,\n    senderId: original.senderId,\n    interested,\n    replyToSend: cleanReply || \"Thanks for your message!\"\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -688,
+        -208
+      ],
+      "id": "fb840e49-6d71-41f3-b104-a474e1eaf1ac",
+      "name": "Parse Interest",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0bb6a554-d11c-4419-865a-328ddb744a7c",
+              "leftValue": "={{ $json.interested }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -448,
+        -208
+      ],
+      "id": "62006801-eab0-4219-a36c-7418ceb36e1a",
+      "name": "branch on interest"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "contacts",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.contactId }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "interested"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -384,
+        -432
+      ],
+      "id": "75b9e036-9525-494e-b86f-977ef067c074",
+      "name": "Update a row",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "327RHTvecFRY0647",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.instagram.com/v21.0/me/messages",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "IGAATkn23uqChBZAFpTbEo0R0l6YmQyd05OUjdMS1dEZA2hDcGJjaWlYYW0tTjU1aS1vd1NwcmFLelNfZA241RU44LWxycHlVZAG9zcEVQZAU55Q1NQQThldVZAPbm4xYjFnYlJSTGxFU19JS2RfYVFiZAzVBWHIxTktOTGRib1ZAKMVRTWQZDZD"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": { \"id\": \"{{ $json.senderId }}\" },\n  \"message\": { \"text\": \"{{ $json.replyToSend }}\" }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -96,
+        -544
+      ],
+      "id": "5cb16abd-41da-4087-b625-bb3e49174693",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BPRT05Z19",
+          "mode": "list",
+          "cachedResultName": "all-aimlengineer"
+        },
+        "text": "=🔥 Interested contact on Instagram  Contact ID: {{ $json.contactId }} This contact wants to get started — follow up with payment or  booking link.",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        -176,
+        -352
+      ],
+      "id": "077deb54-09fa-40c1-8c4c-f3fa8b2d47a1",
+      "name": "Send a message1",
+      "webhookId": "ee0f66a1-42b0-4a2d-ab10-846a2db5ce03",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "Gv7GEpSodkHwSmeD",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.instagram.com/v21.0/me/messages",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "IGAATkn23uqChBZAFpTbEo0R0l6YmQyd05OUjdMS1dEZA2hDcGJjaWlYYW0tTjU1aS1vd1NwcmFLelNfZA241RU44LWxycHlVZAG9zcEVQZAU55Q1NQQThldVZAPbm4xYjFnYlJSTGxFU19JS2RfYVFiZAzVBWHIxTktOTGRib1ZAKMVRTWQZDZD"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": { \"id\": \"{{ $json.senderId }}\" },\n  \"message\": { \"text\": \"{{ $json.replyToSend }}\" }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -128,
+        96
+      ],
+      "id": "81184624-3f5d-4051-94b7-2cffdf5f6fe3",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $json;\n\nconst safeReply = (item.replyToSend || '')\n  .replace(/\\r\\n/g, ' ')\n  .replace(/\\n/g, ' ')\n  .replace(/\\r/g, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim();\n\nreturn {\n  json: {\n    ...item,\n    replyToSend: safeReply\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        16
+      ],
+      "id": "0bae87eb-ba87-4304-a0e0-518fc11f17d2",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "muhammadayyan.app.n8n.cloud",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "accept-encoding": "gzip, br",
+            "accept-language": "en-GB,en-US;q=0.9,en;q=0.8,ur;q=0.7",
+            "cdn-loop": "cloudflare; loops=1; subreqs=1",
+            "cf-connecting-ip": "103.253.18.213",
+            "cf-ew-via": "15",
+            "cf-ipcountry": "PK",
+            "cf-ray": "a428dce28f64c53c-KHI",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-worker": "n8n.cloud",
+            "cookie": "_fbp=fb.1.1760009309123.761012200282977369; ph_phc_4URIAm1uYfJO7j8kWSe0J8lc8IqnstRLS7Jx8NcakHo_posthog=%7B%22%24device_id%22%3A%2241918fd9bde5f02771b6023619e49bd0231e7341dc19c35490daa1e77452089a%235f027411-5678-46b7-928f-c4f33d7ff7da%22%2C%22distinct_id%22%3A%222978939d40bb15538c35ed32c9f4991d2358bb784ae4dc960ab6f1b49d86a5f2%231c3ea275-a00a-4100-90db-d36f748b6ec6%22%2C%22%24sesid%22%3A%5B1772475984562%2C%22019cafcd-2ab5-760d-80f2-3fcd41d11ff3%22%2C1772475984562%5D%2C%22%24epp%22%3Atrue%2C%22%24initial_person_info%22%3A%7B%22r%22%3A%22%24direct%22%2C%22u%22%3A%22https%3A%2F%2Fkhizar47.app.n8n.cloud%2Fhome%2Fworkflows%22%7D%2C%22%24user_state%22%3A%22identified%22%7D; _ga=GA1.1.1825633309.1760372512; _gcl_aw=GCL.1789970830.CjwKCAjwiL7VBhA-EiwAhZi9EP9Zf9t6tUhABuazt_XTrTnMpAlN5SzeUsFypoWGXoReQe1qt8H7-hoCPjgQAvD_BwE; _gcl_au=1.1.1719596401.1783770959.-.-.1784744206.2098005048.1789970833.1789971263; rl_page_init_referrer=RudderEncrypt%3AU2FsdGVkX18FxEWd151HFBjDSxZAFAcvAZUWFDnhLMw%3D; _ga_0SC4FF2FH9=GS2.1.s1789970832$o13$g1$t1789971536$j2$l0$h0; _6c8a5=2aec3d90263c6c62; rl_anonymous_id=RudderEncrypt%3AU2FsdGVkX1%2FAFO8%2Fzaxfyl0qZqZb%2F6M%2FeDZbXCWdHhKmKVHZ5oxPEkeXHf85rpXFiiwiKKm1DUl0TkHLxTgW6g%3D%3D; rl_user_id=RudderEncrypt%3AU2FsdGVkX1%2FHxDptRZrMmb1EmNF5Rstm28fmDwARTKlRkPRkjocJicMGQVzmYnMDu3WuxWPG5EG609Z3Xdzt82hFc9ID%2FuFTswpN3nylS34iQUkEzgH9FF%2FoFyJqRFhRCWsU3xNBoQHeYXrGx2ma0LI7u9svahl3HLUamDuqtzU%3D; rl_trait=RudderEncrypt%3AU2FsdGVkX1%2FITT6NUaSCYiV9%2FksqbtWdBx15qPD3T02s4DBPauCyIX02GNltONDIkRVeGYnTfUiT3EYlEV1DUKYtYvPL6E%2F0DhDcBOFGfi2sBugJq%2FJUW7ULO1Sd4L9xKI0JoGgXx2mXaqQu9kivd9lZhtvUwwjVxw2ocNguVXM4%2FzzrAsHBsdNM%2FlHicECX4vTlgzIwlDa7Y2FuYzZI06e0VFdmgcqBIAAqhpPu%2F2c%3D; n8n_anonymous_id=b5d53732-fc50-4a79-81e7-b5a669223f03; rl_session=RudderEncrypt%3AU2FsdGVkX19h3Z1qMNB%2F190z9XFdpln9R9GUBboBZNZizQa%2B8wXIQGhPeYRXmfGT0pFJcflUtL3oEpbitmEJu8p76dxpssqD%2FU30ea1uRuTNGrTh6EGOqVvsw%2FGOAs6i9dmuLN8SNXaaJeebMtdFSw%3D%3D; ph_phc_kMstNfAgBcBkWSh6KdsgN09heqqNe5VNmalHP1Ni9Q4_posthog=%7B%22%24device_id%22%3A%22329bb056525133e8a18ce7e84529e7b2b2003d0979529c75ee2e06740a81fc57%2310dd0430-3701-41f8-850e-188f16f90f08%22%2C%22distinct_id%22%3A%22329bb056525133e8a18ce7e84529e7b2b2003d0979529c75ee2e06740a81fc57%2310dd0430-3701-41f8-850e-188f16f90f08%22%2C%22%24sesid%22%3A%5B1790662615623%2C%2201a0eba1-17c6-75cc-a95e-192307dc58c3%22%2C1790659598271%5D%2C%22%24epp%22%3Atrue%2C%22%24initial_person_info%22%3A%7B%22r%22%3A%22%24direct%22%2C%22u%22%3A%22https%3A%2F%2Faimlengineer.app.n8n.cloud%2Fsignin%3Fredirect%3D%25252F%22%7D%2C%22%24user_state%22%3A%22identified%22%7D",
+            "priority": "u=0, i",
+            "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "document",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-site": "none",
+            "sec-fetch-user": "?1",
+            "upgrade-insecure-requests": "1",
+            "x-forwarded-for": "103.253.18.213, 104.22.232.167",
+            "x-forwarded-host": "muhammadayyan.app.n8n.cloud",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "traefik-prod-users-gwc-91-6c5f66d98-pqpml",
+            "x-is-trusted": "yes",
+            "x-real-ip": "103.253.18.213"
+          },
+          "params": {},
+          "query": {
+            "hub.mode": "subscribe",
+            "hub.verify_token": "comment123",
+            "hub.challenge": "hello456"
+          },
+          "body": {},
+          "webhookUrl": "https://muhammadayyan.app.n8n.cloud/webhook/instagram",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Normalize New Contact": [
+      {
+        "json": {
+          "contactId": 1,
+          "senderId": "12334",
+          "messageText": "Yes I'm interested, how do I get started?"
+        }
+      }
+    ],
+    "Webhook1": [
+      {
+        "json": {
+          "headers": {
+            "host": "muhammadayyan.app.n8n.cloud",
+            "user-agent": "facebookexternalua",
+            "content-length": "378",
+            "accept": "*/*",
+            "accept-encoding": "gzip, br",
+            "cdn-loop": "cloudflare; loops=1; subreqs=1",
+            "cf-connecting-ip": "2a03:2880:10ff:54::",
+            "cf-ew-via": "15",
+            "cf-ipcountry": "US",
+            "cf-ray": "a45a43bb2e0dfe58-DFW",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-worker": "n8n.cloud",
+            "content-type": "application/json",
+            "instagram-api-version": "v26.0",
+            "x-forwarded-for": "2a03:2880:10ff:54::, 172.71.167.98",
+            "x-forwarded-host": "muhammadayyan.app.n8n.cloud",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "traefik-prod-users-gwc-91-6c5f66d98-pkfbc",
+            "x-hub-signature": "sha1=c7aea433a8047279b6154f74da1e0e1562d4b00b",
+            "x-hub-signature-256": "sha256=7e434852003c6529fca4637c21bd25f6a964961b13bf60d4c19e6c5c4d0d1671",
+            "x-is-trusted": "yes",
+            "x-real-ip": "2a03:2880:10ff:54::"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "object": "instagram",
+            "entry": [
+              {
+                "time": 1791180640280,
+                "id": "17841470289378766",
+                "messaging": [
+                  {
+                    "sender": {
+                      "id": "1760358935578095"
+                    },
+                    "recipient": {
+                      "id": "17841470289378766"
+                    },
+                    "timestamp": 1791180639942,
+                    "read": {
+                      "mid": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDcwMjg5Mzc4NzY2OjM0MDI4MjM2Njg0MTcxMDMwMTI0NDI2MjcxODgzMjE4NjMxNTI2NjozMzA0MTQ1MDcwOTA2ODg3MDIwNTc5NDM5MzI1Mzc0MDU0NAZDZD"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "webhookUrl": "https://muhammadayyan.app.n8n.cloud/webhook/instagram",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Get a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a row": {
+      "main": [
+        [
+          {
+            "node": "Check Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Contact": {
+      "main": [
+        [
+          {
+            "node": "contact found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "contact found": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize Existing Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "Normalize New Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize New Contact": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Existing Contact": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store": {
+      "ai_tool": [
+        []
+      ],
+      "ai_vectorStore": [
+        [
+          {
+            "node": "knowledge base",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "knowledge base": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Google Gemini": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "knowledge base",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse Interest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Interest": {
+      "main": [
+        [
+          {
+            "node": "branch on interest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "branch on interest": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8d21bd66-f4d0-464e-b181-b02210dc8010",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "329bb056525133e8a18ce7e84529e7b2b2003d0979529c75ee2e06740a81fc57"
+  },
+  "nodeGroups": [],
+  "id": "2s93TPz6vWzRF5S2",
+  "tags": []
+}
